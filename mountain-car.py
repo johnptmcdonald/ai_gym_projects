@@ -1,11 +1,21 @@
 # Mountain Car
-# observation is tuple of position (-1.2 to 0.6) and velocity (-0.07 to 0.07)
+# state space: observation is tuple of position (-1.2 to 0.6) and velocity (-0.07 to 0.07)
+# action space: 0 is push left, 1 is NOOP, 2 is push right
 
+# An MDP is defined by:
+# - a set of states S
+# - a set of actions A
+# - a transition function T(s,a,s'), also called the model, 
+# the probability that performing action a in state s will lead to state s'
+# - a reward function R(s,a,s') or just R(s), or R(s')
+# the reward you get for performing an action in state S, or just for leaving state s, or arriving in state s'
+
+# implement Q-learning with Q-table lookup
 
 import gym
 import numpy as np
 
-MAX_NUM_EPISODES = 5000
+MAX_NUM_EPISODES = 10000
 STEPS_PER_EPISODE = 200
 EPSILON_MIN = 0.005
 max_num_steps = MAX_NUM_EPISODES * STEPS_PER_EPISODE
@@ -35,7 +45,6 @@ class Q_Learner(object):
 		return tuple(((obs - self.obs_low) / self.bin_width).astype(int))
 
 	def get_action(self, obs):
-		print('obs',obs)
 		discretized_obs = self.discretize(obs)
 		if self.epsilon > EPSILON_MIN:
 			self.epsilon -= EPSILON_DECAY
@@ -47,9 +56,10 @@ class Q_Learner(object):
 	def learn(self, obs, action, reward, next_obs):
 		discretized_obs = self.discretize(obs)
 		discretized_next_obs = self.discretize(next_obs)
-
-		self.Q[discretized_obs][action] += self.alpha * (reward + self.gamma * np.max(self.Q[discretized_next_obs] - self.Q[discretized_obs][action]))
-
+		td_target = reward + self.gamma * np.max(self.Q[discretized_next_obs])
+		td_error = td_target - self.Q[discretized_obs][action]
+		
+		self.Q[discretized_obs][action] += self.alpha * td_error
 
 def train(agent, env):
 	best_reward = -float('inf')
@@ -68,9 +78,10 @@ def train(agent, env):
 		if total_reward > best_reward:
 			best_reward = total_reward
 
-		print("Episode#:{} reward:{} best_reward:{} eps:{}"
-			.format(episode,total_reward, best_reward, agent.epsilon)
-		)
+		if episode%100 == 0:
+			print("Episode#:{} reward:{} best_reward:{} eps:{}"
+				.format(episode,total_reward, best_reward, agent.epsilon)
+			)
 
 	return np.argmax(agent.Q, axis=2)
 
@@ -94,7 +105,7 @@ if __name__ == "__main__":
 	learned_policy = train(agent, env)
 	print('finished training')
 	print(agent.Q)
-	gym_monitor_path = "./gym_monitor_output"
+	gym_monitor_path = "./mountain_car_output"
 
 	env = gym.wrappers.Monitor(env, gym_monitor_path, force=True)
 	
